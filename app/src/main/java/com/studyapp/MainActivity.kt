@@ -28,6 +28,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import kotlinx.coroutines.delay
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.collectAsStateWithLifecycle
 
 class MainActivity : ComponentActivity() {
@@ -114,16 +115,22 @@ fun PlannerScreen() {
 
 @Composable
 fun BlocksScreen() {
-    val apps = remember { mutableStateListOf("com.youtube", "com.instagram", "com.tiktok") }
-    var protection by remember { mutableStateOf("Disabled") }
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val installed = remember { com.studyapp.util.AppEnumerator.list(ctx) }
+    val selected = remember { mutableStateListOf<String>() }
+    var protection by remember { mutableStateOf("Disabled (NoOp engine)") }
     Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Blocks", fontSize = 24.sp, fontWeight = FontWeight.Bold)
         Text("Permission status: Usage Access not granted", color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text("Protection: $protection", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text("Restricted apps", fontWeight = FontWeight.SemiBold)
-        apps.forEach { Text("• $it") }
-        Button(onClick = { apps.add("com.example.app") }) { Text("Add App") }
-        Text("Blocking engine: NoOp (degraded). Accessibility/usage detection not yet implemented.", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+        Text("Restricted apps (${selected.size} selected)", fontWeight = FontWeight.SemiBold)
+        installed.take(20).forEach { app ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(checked = selected.contains(app.packageName), onCheckedChange = { c -> if (c) selected.add(app.packageName) else selected.remove(app.packageName) })
+                Text(app.label, modifier = Modifier.weight(1f))
+            }
+        }
+        Text("Blocking engine: NoOp (degraded). Real foreground detection not implemented.", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
     }
 }
 
