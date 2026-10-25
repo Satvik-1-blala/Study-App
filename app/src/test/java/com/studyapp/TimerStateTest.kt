@@ -1,23 +1,12 @@
 package com.studyapp
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.test.TestDispatcher
-import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.test.advanceTimeBy
+import com.studyapp.viewmodel.FocusViewModel
 import org.junit.Assert.*
-import org.junit.Before
 import org.junit.Test
 
 class TimerStateTest {
-    private val testDispatcher = TestDispatcher()
-
-    @Before
-    fun setup() {
-        Dispatchers.setMain(testDispatcher)
-    }
-
     @Test
-    fun startPauseResumeReset() = runTest {
+    fun startPauseResumeReset() {
         val vm = FocusViewModel()
         assertEquals(25 * 60, vm.remaining.value)
         assertFalse(vm.running.value)
@@ -25,20 +14,16 @@ class TimerStateTest {
         vm.start()
         assertTrue(vm.running.value)
 
-        advanceTimeBy(5_000)
-        // tick logic lives in viewModel, not tested here; state flow updates via tick()
         vm.tick()
         assertEquals(25 * 60 - 1, vm.remaining.value)
 
         vm.pause()
         assertFalse(vm.running.value)
         val paused = vm.remaining.value
-        advanceTimeBy(10_000)
         assertEquals(paused, vm.remaining.value)
 
         vm.start()
         assertTrue(vm.running.value)
-        advanceTimeBy(5_000)
         vm.tick()
         assertEquals(paused - 1, vm.remaining.value)
 
@@ -48,7 +33,7 @@ class TimerStateTest {
     }
 
     @Test
-    fun stopAtZero() = runTest {
+    fun stopAtZero() {
         val vm = FocusViewModel()
         vm.reset(2)
         vm.start()
@@ -56,14 +41,13 @@ class TimerStateTest {
         assertEquals(1, vm.remaining.value)
         vm.tick()
         assertEquals(0, vm.remaining.value)
-        // should not go negative
         vm.tick()
         assertEquals(0, vm.remaining.value)
         assertFalse(vm.running.value)
     }
 
     @Test
-    fun customDuration() = runTest {
+    fun customDuration() {
         val vm = FocusViewModel()
         vm.reset(10 * 60)
         assertEquals(10 * 60, vm.remaining.value)
