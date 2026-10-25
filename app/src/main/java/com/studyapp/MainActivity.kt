@@ -104,14 +104,36 @@ fun HomeScreen(viewModel: FocusViewModel = androidx.activity.viewModels()) {
 
 @Composable
 fun PlannerScreen() {
-    var items by remember { mutableStateOf(listOf("Mon 09:00-10:00 Deep Work")) }
-    var title by remember { mutableStateOf("") }
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+    val schedules = remember { mutableStateListOf<com.studyapp.data.ScheduleEntity>() }
+    LaunchedEffect(Unit) { schedules.addAll(com.studyapp.data.DatabaseProvider.get(ctx).scheduleDao().all()) }
+    var subject by remember { mutableStateOf("") }
     Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Planner", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-        OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("New schedule (e.g. Mon 09:00-10:00 Subject)") }, modifier = Modifier.fillMaxWidth())
-        Button(onClick = { if (title.isNotBlank()) { items = items + title; title = "" } }) { Text("Add schedule") }
-        items.forEach { Text("• $it") }
-        Text("Room persistence via ScheduleRepository to be wired.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+        OutlinedTextField(value = subject, onValueChange = { subject = it }, label = { Text("Subject") }, modifier = Modifier.fillMaxWidth())
+        Button(onClick = {
+            if (subject.isNotBlank()) {
+                scope.launch {
+                    val s = com.studyapp.data.ScheduleEntity(dayOfWeek = 1, startMinute = 540, endMinute = 600, subject = subject, profile = "default")
+                    com.studyapp.data.DatabaseProvider.get(ctx).scheduleDao().insert(s)
+                    schedules.clear(); schedules.addAll(com.studyapp.data.DatabaseProvider.get(ctx).scheduleDao().all())
+                    subject = ""
+                }
+            }
+        }) { Text("Add schedule") }
+        schedules.forEach { s ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("• ${s.subject} (day ${s.dayOfWeek})", modifier = Modifier.weight(1f))
+                TextButton(onClick = {
+                    scope.launch {
+                        com.studyapp.data.DatabaseProvider.get(ctx).scheduleDao().delete(s.id)
+                        schedules.clear(); schedules.addAll(com.studyapp.data.DatabaseProvider.get(ctx).scheduleDao().all())
+                    }
+                }) { Text("Delete") }
+            }
+        }
+        if (schedules.isEmpty()) Text("No schedules yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -148,7 +170,18 @@ fun BlocksScreen() {
 }
 
 @Composable
-fun InsightsScreen() { ScreenPlaceholder("Insights", "Usage stats, charts, blocking triggers (Usage Access required)") }
+fun InsightsScreen() {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val sessions = remember { mutableStateListOf<com.studyapp.data.SessionEntity>() }
+    LaunchedEffect(Unit) { sessions.addAll(com.studyapp.data.DatabaseProvider.get(ctx).sessionDao().all()) }
+    Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Insights", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        Text("Completed sessions: ${sessions.size}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        val totalMin = sessions.sumOf { it.durationSeconds } / 60
+        Text("Total focus minutes: $totalMin", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Usage Access not granted — app usage unavailable.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+    }
+}
 @Composable
 fun GroupsScreen() { ScreenPlaceholder("Focus Groups", "Real backend required; honest setup state shown until configured") }
 @Composable
