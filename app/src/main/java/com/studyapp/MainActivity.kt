@@ -3,6 +3,7 @@ package com.studyapp
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -20,12 +21,14 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewModelScope
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectAsStateWithLifecycle
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -71,11 +74,10 @@ fun AppRoot() {
 }
 
 @Composable
-fun HomeScreen() {
-    var total by remember { mutableStateOf(25 * 60) }
-    var remaining by remember { mutableStateOf(25 * 60) }
-    var running by remember { mutableStateOf(false) }
-    LaunchedEffect(running) { while (running && remaining > 0) { delay(1000); remaining-- }; if (remaining == 0) running = false }
+fun HomeScreen(viewModel: FocusViewModel = androidx.activity.viewModels()) {
+    val remaining by viewModel.remaining.collectAsStateWithLifecycle()
+    val running by viewModel.running.collectAsStateWithLifecycle()
+    val total by remember { mutableStateOf(25 * 60) }
     val progress = 1f - (remaining.toFloat() / total)
     Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Text("Study App", fontSize = 20.sp, fontWeight = FontWeight.Medium)
@@ -90,8 +92,8 @@ fun HomeScreen() {
         Text("Today's goal: 3h  •  Tracked: 0h", color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text("Next session: none scheduled", color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Button(onClick = { running = !running }, modifier = Modifier.weight(1f)) { Text(if (running) "Pause" else "Start Focus") }
-            OutlinedButton(onClick = { running = false; remaining = total }) { Text("Reset") }
+            Button(onClick = { if (running) viewModel.pause() else viewModel.start() }, modifier = Modifier.weight(1f)) { Text(if (running) "Pause" else "Start Focus") }
+            OutlinedButton(onClick = { viewModel.reset(total) }) { Text("Reset") }
         }
         Text("Strict Mode: off  •  Restricted apps: 0  •  Blocking: disabled", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
     }
@@ -106,7 +108,7 @@ fun PlannerScreen() {
         OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("New schedule (e.g. Mon 09:00-10:00 Subject)") }, modifier = Modifier.fillMaxWidth())
         Button(onClick = { if (title.isNotBlank()) { items = items + title; title = "" } }) { Text("Add schedule") }
         items.forEach { Text("• $it") }
-        Text("Schedules are stored in memory; Room persistence wired in data layer.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+        Text("Room persistence via ScheduleRepository to be wired.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
     }
 }
 
