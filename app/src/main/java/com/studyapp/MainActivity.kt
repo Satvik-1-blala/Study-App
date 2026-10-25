@@ -77,11 +77,11 @@ fun AppRoot() {
 }
 
 @Composable
-fun HomeScreen(viewModel: FocusViewModel = androidx.activity.viewModels()) {
-    val remaining by viewModel.remaining.collectAsStateWithLifecycle()
-    val running by viewModel.running.collectAsStateWithLifecycle()
-    val total by remember { mutableStateOf(25 * 60) }
-    LaunchedEffect(running) { while (running) { delay(1000); viewModel.tick() } }
+fun HomeScreen() {
+    var remaining by remember { mutableStateOf(25 * 60) }
+    var running by remember { mutableStateOf(false) }
+    val total = 25 * 60
+    LaunchedEffect(running) { while (running && remaining > 0) { delay(1000); remaining-- } }
     val progress = 1f - (remaining.toFloat() / total)
     Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Text("Study App", fontSize = 20.sp, fontWeight = FontWeight.Medium)
@@ -96,8 +96,8 @@ fun HomeScreen(viewModel: FocusViewModel = androidx.activity.viewModels()) {
         Text("Today's goal: 3h  •  Tracked: 0h", color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text("Next session: none scheduled", color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Button(onClick = { if (running) viewModel.pause() else viewModel.start() }, modifier = Modifier.weight(1f)) { Text(if (running) "Pause" else "Start Focus") }
-            OutlinedButton(onClick = { viewModel.reset(total) }) { Text("Reset") }
+            Button(onClick = { running = !running }, modifier = Modifier.weight(1f)) { Text(if (running) "Pause" else "Start Focus") }
+            OutlinedButton(onClick = { running = false; remaining = total }) { Text("Reset") }
         }
         Text("Strict Mode: off  •  Restricted apps: 0  •  Blocking: disabled", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
     }
