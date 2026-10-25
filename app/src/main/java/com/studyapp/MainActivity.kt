@@ -28,6 +28,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.collectAsStateWithLifecycle
 
@@ -116,8 +118,13 @@ fun PlannerScreen() {
 @Composable
 fun BlocksScreen() {
     val ctx = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
     val installed = remember { com.studyapp.util.AppEnumerator.list(ctx) }
     val selected = remember { mutableStateListOf<String>() }
+    LaunchedEffect(Unit) {
+        val db = com.studyapp.data.DatabaseProvider.get(ctx)
+        selected.addAll(db.blockedAppDao().all().map { it.packageName })
+    }
     var protection by remember { mutableStateOf("Disabled (NoOp engine)") }
     Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Blocks", fontSize = 24.sp, fontWeight = FontWeight.Bold)
@@ -126,7 +133,13 @@ fun BlocksScreen() {
         Text("Restricted apps (${selected.size} selected)", fontWeight = FontWeight.SemiBold)
         installed.take(20).forEach { app ->
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(checked = selected.contains(app.packageName), onCheckedChange = { c -> if (c) selected.add(app.packageName) else selected.remove(app.packageName) })
+                Checkbox(checked = selected.contains(app.packageName), onCheckedChange = { c ->
+                    scope.launch {
+                        val db = com.studyapp.data.DatabaseProvider.get(ctx)
+                        if (c) { selected.add(app.packageName); db.blockedAppDao().upsert(com.studyapp.data.BlockedAppEntity(app.packageName, app.label)) }
+                        else { selected.remove(app.packageName); db.blockedAppDao().remove(app.packageName) }
+                    }
+                })
                 Text(app.label, modifier = Modifier.weight(1f))
             }
         }
