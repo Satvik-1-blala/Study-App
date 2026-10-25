@@ -4,6 +4,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -12,8 +14,10 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 
 class MainActivity : ComponentActivity() {
@@ -22,11 +26,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme(colorScheme = darkColorScheme()) {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    val nav = rememberNavController()
-                    NavHost(navController = nav, startDestination = "onboarding") {
-                        composable("onboarding") { OnboardingScreen(onFinish = { nav.navigate("home") { popUpTo("onboarding") { inclusive = true } } }) }
-                        composable("home") { HomeScreen() }
-                    }
+                    AppRoot()
                 }
             }
         }
@@ -34,72 +34,39 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun OnboardingScreen(onFinish: () -> Unit) {
-    var step by remember { mutableStateOf(0) }
-    val total = 6
-    Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        LinearProgressIndicator(progress = { (step + 1f) / total }, modifier = Modifier.fillMaxWidth())
-        when (step) {
-            0 -> {
-                Text("Rescue Your Time", fontSize = 28.sp, fontWeight = FontWeight.Bold)
-                Text("Study App helps you focus without digital distractions. It needs Usage Access for insights and optional Accessibility for blocking.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Button(onClick = { step++ }) { Text("Set up my focus") }
-                TextButton(onClick = onFinish) { Text("Not now") }
+fun AppRoot() {
+    val nav = rememberNavController()
+    val items = listOf("home","planner","blocks","insights","groups","music","settings")
+    val labels = mapOf("home" to "Home","planner" to "Planner","blocks" to "Blocks","insights" to "Insights","groups" to "Groups","music" to "Music","settings" to "Settings")
+    val icons = mapOf("home" to Icons.Filled.Home,"planner" to Icons.Filled.DateRange,"blocks" to Icons.Filled.Block,"insights" to Icons.Filled.BarChart,"groups" to Icons.Filled.Group,"music" to Icons.Filled.MusicNote,"settings" to Icons.Filled.Settings)
+    Scaffold(bottomBar = {
+        NavigationBar {
+            val back by nav.currentBackStackEntryAsState()
+            val cur = back?.destination?.route
+            items.forEach { r ->
+                NavigationBarItem(selected = cur == r, onClick = {
+                    nav.navigate(r) { popUpTo(nav.graph.findStartDestination().id) { saveState = true }; launchSingleTop = true; restoreState = true }
+                }, icon = { Icon(icons[r]!!, contentDescription = labels[r]) }, label = { Text(labels[r]!!) })
             }
-            1 -> {
-                Text("Focus goal", fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
-                val goals = listOf("School/Boards","JEE","NEET","UPSC","Coding","Reading","Writing","Deep Work","General Study")
-                var selected by remember { mutableStateOf<String?>(null) }
-                goals.chunked(3).forEach { row ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        row.forEach { g ->
-                            FilterChip(selected = selected == g, onClick = { selected = g }, label = { Text(g) })
-                        }
-                    }
-                }
-                Button(onClick = { step++ }, enabled = selected != null) { Text("Continue") }
-            }
-            2 -> {
-                Text("Distractions", fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
-                val apps = listOf("YouTube","Instagram","TikTok","Snapchat","Reddit","Facebook","Gaming","Streaming")
-                val selected = remember { mutableStateListOf<String>() }
-                apps.forEach { a ->
-                    FilterChip(selected = selected.contains(a), onClick = { if (selected.contains(a)) selected.remove(a) else selected.add(a) }, label = { Text(a) })
-                }
-                Button(onClick = { step++ }) { Text("Continue") }
-            }
-            3 -> {
-                Text("Daily study target", fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
-                var hours by remember { mutableStateOf(3f) }
-                Text("${hours.toInt()} hours", fontSize = 40.sp, fontFamily = FontFamily.Monospace)
-                Slider(value = hours, onValueChange = { hours = it }, valueRange = 0.5f..8f, steps = 14)
-                Button(onClick = { step++ }) { Text("Continue") }
-            }
-            4 -> {
-                Text("Permissions", fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
-                Text("Usage Access: insights and foreground detection. Accessibility: only if blocking requires it. Notifications: reminders. Each explained separately.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Button(onClick = { step++ }) { Text("Continue") }
-            }
-            5 -> {
-                Text("Review & begin", fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
-                Text("Distractions, goal, and daily target saved. Blocking capabilities as enabled.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Button(onClick = onFinish) { Text("Enter my focus dashboard") }
-            }
+        }
+    }) { pad ->
+        NavHost(navController = nav, startDestination = "home", modifier = Modifier.padding(pad)) {
+                composable("onboarding") { OnboardingScreen(onFinish = { nav.navigate("home") { popUpTo("onboarding") { inclusive = true } } }) }
+            composable("home") { HomeScreen() }
+            composable("planner") { PlannerScreen() }
+            composable("blocks") { BlocksScreen() }
+            composable("insights") { InsightsScreen() }
+            composable("groups") { GroupsScreen() }
+            composable("music") { MusicScreen() }
+            composable("settings") { SettingsScreen() }
         }
     }
 }
 
-@Composable
-fun HomeScreen() {
+@Composable fun HomeScreen() {
     var remaining by remember { mutableStateOf(25 * 60) }
     var running by remember { mutableStateOf(false) }
-    LaunchedEffect(running) {
-        while (running && remaining > 0) {
-            kotlinx.coroutines.delay(1000)
-            remaining--
-        }
-        if (remaining == 0) running = false
-    }
+    LaunchedEffect(running) { while (running && remaining > 0) { kotlinx.coroutines.delay(1000); remaining-- }; if (remaining == 0) running = false }
     Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Text("Study App", fontSize = 20.sp, fontWeight = FontWeight.Medium)
         Text("Focus session", color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -109,5 +76,17 @@ fun HomeScreen() {
             OutlinedButton(onClick = { running = false; remaining = 25 * 60 }) { Text("Reset") }
         }
         Text("Strict Mode: off  •  Restricted apps: 0", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+@Composable fun PlannerScreen() { ScreenPlaceholder("Planner", "Weekly timetable, schedules, tasks") }
+@Composable fun BlocksScreen() { ScreenPlaceholder("Blocks", "App selection, profiles, blocking engine") }
+@Composable fun InsightsScreen() { ScreenPlaceholder("Insights", "Usage stats, charts, blocking triggers") }
+@Composable fun GroupsScreen() { ScreenPlaceholder("Focus Groups", "Real backend required; honest setup state shown until configured") }
+@Composable fun MusicScreen() { ScreenPlaceholder("Music & Themes", "Media3 ambient tracks, themes, animated backgrounds") }
+@Composable fun SettingsScreen() { ScreenPlaceholder("Settings", "Permissions, onboarding revisit, privacy, data deletion") }
+@Composable fun ScreenPlaceholder(title: String, subtitle: String) {
+    Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(title, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
