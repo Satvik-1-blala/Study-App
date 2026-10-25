@@ -3,6 +3,7 @@ package com.studyapp
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -10,6 +11,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -19,6 +25,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -51,7 +58,7 @@ fun AppRoot() {
         }
     }) { pad ->
         NavHost(navController = nav, startDestination = "home", modifier = Modifier.padding(pad)) {
-                composable("onboarding") { OnboardingScreen(onFinish = { nav.navigate("home") { popUpTo("onboarding") { inclusive = true } } }) }
+            composable("onboarding") { OnboardingScreen(onFinish = { nav.navigate("home") { popUpTo("onboarding") { inclusive = true } } }) }
             composable("home") { HomeScreen() }
             composable("planner") { PlannerScreen() }
             composable("blocks") { BlocksScreen() }
@@ -63,28 +70,71 @@ fun AppRoot() {
     }
 }
 
-@Composable fun HomeScreen() {
+@Composable
+fun HomeScreen() {
+    var total by remember { mutableStateOf(25 * 60) }
     var remaining by remember { mutableStateOf(25 * 60) }
     var running by remember { mutableStateOf(false) }
-    LaunchedEffect(running) { while (running && remaining > 0) { kotlinx.coroutines.delay(1000); remaining-- }; if (remaining == 0) running = false }
+    LaunchedEffect(running) { while (running && remaining > 0) { delay(1000); remaining-- }; if (remaining == 0) running = false }
+    val progress = 1f - (remaining.toFloat() / total)
     Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Text("Study App", fontSize = 20.sp, fontWeight = FontWeight.Medium)
         Text("Focus session", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(String.format("%02d:%02d", remaining / 60, remaining % 60), fontSize = 72.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Button(onClick = { running = !running }) { Text(if (running) "Pause" else "Start focus") }
-            OutlinedButton(onClick = { running = false; remaining = 25 * 60 }) { Text("Reset") }
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(220.dp)) {
+            Canvas(Modifier.size(220.dp)) {
+                drawArc(Color(0xFF1F2937), -90f, 360f, false, style = Stroke(12.dp.toPx(), cap = StrokeCap.Round), size = Size(size.width, size.height), topLeft = Offset.Zero)
+                drawArc(Color(0xFF00E676), -90f, 360f * progress, false, style = Stroke(12.dp.toPx(), cap = StrokeCap.Round), size = Size(size.width, size.height), topLeft = Offset.Zero)
+            }
+            Text(String.format("%02d:%02d", remaining / 60, remaining % 60), fontSize = 44.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
         }
-        Text("Strict Mode: off  •  Restricted apps: 0", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Today's goal: 3h  •  Tracked: 0h", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Next session: none scheduled", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Button(onClick = { running = !running }, modifier = Modifier.weight(1f)) { Text(if (running) "Pause" else "Start Focus") }
+            OutlinedButton(onClick = { running = false; remaining = total }) { Text("Reset") }
+        }
+        Text("Strict Mode: off  •  Restricted apps: 0  •  Blocking: disabled", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
     }
 }
-@Composable fun PlannerScreen() { ScreenPlaceholder("Planner", "Weekly timetable, schedules, tasks") }
-@Composable fun BlocksScreen() { ScreenPlaceholder("Blocks", "App selection, profiles, blocking engine") }
-@Composable fun InsightsScreen() { ScreenPlaceholder("Insights", "Usage stats, charts, blocking triggers") }
-@Composable fun GroupsScreen() { ScreenPlaceholder("Focus Groups", "Real backend required; honest setup state shown until configured") }
-@Composable fun MusicScreen() { ScreenPlaceholder("Music & Themes", "Media3 ambient tracks, themes, animated backgrounds") }
-@Composable fun SettingsScreen() { ScreenPlaceholder("Settings", "Permissions, onboarding revisit, privacy, data deletion") }
-@Composable fun ScreenPlaceholder(title: String, subtitle: String) {
+
+@Composable
+fun PlannerScreen() {
+    var items by remember { mutableStateOf(listOf("Mon 09:00-10:00 Deep Work")) }
+    var title by remember { mutableStateOf("") }
+    Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Planner", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("New schedule (e.g. Mon 09:00-10:00 Subject)") }, modifier = Modifier.fillMaxWidth())
+        Button(onClick = { if (title.isNotBlank()) { items = items + title; title = "" } }) { Text("Add schedule") }
+        items.forEach { Text("• $it") }
+        Text("Schedules are stored in memory; Room persistence wired in data layer.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+    }
+}
+
+@Composable
+fun BlocksScreen() {
+    val apps = remember { mutableStateListOf("com.youtube", "com.instagram", "com.tiktok") }
+    var protection by remember { mutableStateOf("Disabled") }
+    Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Blocks", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        Text("Permission status: Usage Access not granted", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Protection: $protection", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Restricted apps", fontWeight = FontWeight.SemiBold)
+        apps.forEach { Text("• $it") }
+        Button(onClick = { apps.add("com.example.app") }) { Text("Add App") }
+        Text("Blocking engine: NoOp (degraded). Accessibility/usage detection not yet implemented.", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+    }
+}
+
+@Composable
+fun InsightsScreen() { ScreenPlaceholder("Insights", "Usage stats, charts, blocking triggers (Usage Access required)") }
+@Composable
+fun GroupsScreen() { ScreenPlaceholder("Focus Groups", "Real backend required; honest setup state shown until configured") }
+@Composable
+fun MusicScreen() { ScreenPlaceholder("Music & Themes", "Media3 ambient tracks, themes, animated backgrounds") }
+@Composable
+fun SettingsScreen() { ScreenPlaceholder("Settings", "Permissions, onboarding revisit, privacy, data deletion") }
+@Composable
+fun ScreenPlaceholder(title: String, subtitle: String) {
     Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(title, fontSize = 24.sp, fontWeight = FontWeight.Bold)
         Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
