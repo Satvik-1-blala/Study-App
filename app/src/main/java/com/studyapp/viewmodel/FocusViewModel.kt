@@ -16,7 +16,7 @@ class FocusViewModel : ViewModel() {
     fun start() { _running.value = true }
     fun pause() { _running.value = false }
     fun reset(seconds: Int = 25 * 60) { _running.value = false; _remaining.value = seconds }
-    fun tick() { if (_running.value && _remaining.value > 0) _remaining.value-- }
+    fun tick() { if (_running.value) { if (_remaining.value > 0) _remaining.value-- else _running.value = false } }
 
     fun saveCompletedSession(context: Context, subject: String, durationSeconds: Int, startedAt: Long) {
         val db = DatabaseProvider.get(context)

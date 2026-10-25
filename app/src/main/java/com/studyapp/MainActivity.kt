@@ -81,6 +81,7 @@ fun HomeScreen(viewModel: FocusViewModel = androidx.activity.viewModels()) {
     val remaining by viewModel.remaining.collectAsStateWithLifecycle()
     val running by viewModel.running.collectAsStateWithLifecycle()
     val total by remember { mutableStateOf(25 * 60) }
+    LaunchedEffect(running) { while (running) { delay(1000); viewModel.tick() } }
     val progress = 1f - (remaining.toFloat() / total)
     Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Text("Study App", fontSize = 20.sp, fontWeight = FontWeight.Medium)
